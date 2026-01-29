@@ -794,8 +794,15 @@ function App() {
 
             {/* Date/Time and Items Sold */}
             <div className="receipt-center receipt-datetime">
-              <div>{dateTime.date}          {dateTime.time}</div>
-              <div># ITEMS SOLD {totals.itemCount}</div>
+              <div className="receipt-datetime-line">
+                <span>{dateTime.date}</span>
+                <span>{dateTime.time}</span>
+              </div>
+            </div>
+
+            {/* Items Sold - Large and Centered */}
+            <div className="receipt-items-sold">
+              # ITEMS SOLD {totals.itemCount}
             </div>
 
             {/* TC Number */}
@@ -818,7 +825,10 @@ function App() {
             {/* Footer */}
             <div className="receipt-center receipt-footer">
               <div>Low Prices You Can Trust. Every Day.</div>
-              <div>{dateTime.date}          {dateTime.time}</div>
+              <div className="receipt-datetime-line" style={{marginTop: '4px'}}>
+                <span>{dateTime.date}</span>
+                <span>{dateTime.time}</span>
+              </div>
             </div>
           </div>
 
@@ -850,10 +860,315 @@ function App() {
               )}
               Generate via Server
             </button>
+            <button
+              className="btn btn-secondary"
+              onClick={shareReceipt}
+              disabled={isGeneratingPdf}
+              data-testid="share-receipt-btn"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Share2 size={16} />
+              )}
+              Share Receipt
+            </button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// Shared Receipt View Component
+function SharedReceiptView() {
+  const { receiptId } = useParams();
+  const navigate = useNavigate();
+  const [receipt, setReceipt] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const receiptRef = useRef(null);
+
+  useEffect(() => {
+    const fetchReceipt = async () => {
+      try {
+        const response = await axios.get(`${API}/receipts/shared/${receiptId}`);
+        setReceipt(response.data);
+      } catch (err) {
+        setError('Receipt not found');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReceipt();
+  }, [receiptId]);
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Walmart Receipt',
+          text: 'View my Walmart receipt',
+          url: shareUrl
+        });
+      } catch (err) {
+        // User cancelled or error
+        navigator.clipboard.writeText(shareUrl);
+        alert('Link copied to clipboard!');
+      }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      alert('Link copied to clipboard!');
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 3,
+        backgroundColor: '#ffffff',
+        useCORS: true
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdfWidth = 80;
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`walmart_receipt.pdf`);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="shared-receipt-page">
+        <div className="shared-receipt-header">
+          <button onClick={() => navigate('/')} className="back-btn">
+            <ChevronLeft size={24} />
+          </button>
+          <h1>Receipt Detail</h1>
+          <div style={{width: 40}}></div>
+        </div>
+        <div className="shared-receipt-content">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 size={32} className="animate-spin text-blue-600" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !receipt) {
+    return (
+      <div className="shared-receipt-page">
+        <div className="shared-receipt-header">
+          <button onClick={() => navigate('/')} className="back-btn">
+            <ChevronLeft size={24} />
+          </button>
+          <h1>Receipt Detail</h1>
+          <div style={{width: 40}}></div>
+        </div>
+        <div className="shared-receipt-content">
+          <div className="text-center py-16 text-gray-500">
+            <FileText size={48} className="mx-auto mb-4 opacity-50" />
+            <p className="text-lg">Receipt not found</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { store_details, items, tax_rate, payment_details, transaction_date, transaction_time, tc_number, totals } = receipt;
+
+  return (
+    <div className="shared-receipt-page">
+      {/* Header */}
+      <div className="shared-receipt-header">
+        <button onClick={() => navigate('/')} className="back-btn" data-testid="back-btn">
+          <ChevronLeft size={24} />
+        </button>
+        <h1>Receipt Detail</h1>
+        <button onClick={handleShare} className="share-btn" data-testid="share-btn">
+          <Upload size={20} />
+        </button>
+      </div>
+
+      {/* Receipt Content */}
+      <div className="shared-receipt-content">
+        <div className="receipt-container receipt-paper" ref={receiptRef} data-testid="shared-receipt">
+          {/* Header Logo */}
+          <div className="receipt-center">
+            <img src="/walmart-logo.png" alt="Walmart" className="receipt-logo-img" />
+          </div>
+
+          {/* Store Info */}
+          <div className="receipt-center receipt-store-tight">
+            <div>{store_details.store_type}</div>
+            <div>{store_details.phone} Mgr:{store_details.manager_name}</div>
+            <div>{store_details.address_line1}</div>
+            <div>{store_details.city} {store_details.state} {store_details.zip_code}</div>
+          </div>
+
+          {/* Store Numbers */}
+          <div className="receipt-center receipt-store-numbers">
+            ST# {store_details.store_number} OP# {store_details.op_number} TE# {store_details.te_number} TR# {store_details.tr_number}
+          </div>
+
+          {/* Items */}
+          <div className="receipt-items">
+            {items.map((item, idx) => (
+              <React.Fragment key={idx}>
+                {item.is_voided && (
+                  <div className="receipt-center receipt-bold">** VOIDED ENTRY **</div>
+                )}
+                <div className="receipt-item-row">
+                  <span className="receipt-item-name">{item.name.padEnd(14, ' ').substring(0, 14)}</span>
+                  <span className="receipt-item-upc">{item.upc}</span>
+                  <span className="receipt-item-price">{item.is_voided ? `${item.price.toFixed(2)}-${item.tax_flag}` : `${item.price.toFixed(2)} ${item.tax_flag}`}</span>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Totals */}
+          <div className="receipt-totals-section">
+            <div className="receipt-total-line">
+              <span>SUBTOTAL</span>
+              <span className="receipt-value">{totals.subtotal}</span>
+            </div>
+            <div className="receipt-total-line">
+              <span>TAX 1    {tax_rate.toFixed(3)} %</span>
+              <span className="receipt-value">{totals.tax_amount}</span>
+            </div>
+            <div className="receipt-total-line">
+              <span>TOTAL</span>
+              <span className="receipt-value">{totals.total}</span>
+            </div>
+          </div>
+
+          {/* Payment Section */}
+          <div className="receipt-payment-section">
+            <div className="receipt-total-line">
+              <span>{payment_details.payment_method}    TEND</span>
+              <span className="receipt-value">{totals.debit_tend}</span>
+            </div>
+            {payment_details.cash_back > 0 && (
+              <>
+                <div className="receipt-total-line">
+                  <span>DEBIT CASH BACK</span>
+                  <span className="receipt-value">{payment_details.cash_back.toFixed(2)}</span>
+                </div>
+                <div className="receipt-total-line">
+                  <span>TOTAL DEBIT PURCHASE</span>
+                  <span className="receipt-value">{totals.total_debit_purchase}</span>
+                </div>
+                <div className="receipt-total-line">
+                  <span>CHANGE DUE</span>
+                  <span className="receipt-value">{totals.change_due}</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* EFT Details */}
+          <div className="receipt-eft-section">
+            <div className="receipt-item-line">
+              <span>EFT {payment_details.payment_method}</span>
+              <span>PAY FROM PRIMARY</span>
+            </div>
+            <div className="receipt-eft-amounts">
+              <div>{totals.debit_tend} PURCHASE</div>
+              {payment_details.cash_back > 0 && (
+                <>
+                  <div>{payment_details.cash_back.toFixed(2)} CASH BACK</div>
+                  <div>{totals.total_debit_purchase} TOTAL PURCHASE</div>
+                </>
+              )}
+            </div>
+            {payment_details.payment_method !== 'CASH' && (
+              <div>Debit              **** **** **** {payment_details.card_last_four} I O</div>
+            )}
+            <div>REF # {payment_details.ref_number}</div>
+            <div>NETWORK ID. {payment_details.network_id} APPR CODE {payment_details.approval_code}</div>
+            {payment_details.payment_method !== 'CASH' && (
+              <>
+                <div>Debit</div>
+                <div>AID {payment_details.aid}</div>
+                <div>AAC {payment_details.aac}</div>
+                <div>*Pin Verified</div>
+              </>
+            )}
+            <div>TERMINAL # {payment_details.terminal_number}</div>
+          </div>
+
+          {/* Date/Time */}
+          <div className="receipt-center receipt-datetime">
+            <div className="receipt-datetime-line">
+              <span>{transaction_date}</span>
+              <span>{transaction_time}</span>
+            </div>
+          </div>
+
+          {/* Items Sold - Large */}
+          <div className="receipt-items-sold">
+            # ITEMS SOLD {totals.item_count}
+          </div>
+
+          {/* TC Number */}
+          <div className="receipt-center">
+            TC# {tc_number}
+          </div>
+
+          {/* Barcode */}
+          <div className="receipt-barcode">
+            <Barcode
+              value={`TC${tc_number.replace(/ /g, '')}WM`}
+              width={0.85}
+              height={28}
+              fontSize={0}
+              margin={0}
+              displayValue={false}
+            />
+          </div>
+
+          {/* Footer */}
+          <div className="receipt-center receipt-footer">
+            <div>Low Prices You Can Trust. Every Day.</div>
+            <div className="receipt-datetime-line" style={{marginTop: '4px'}}>
+              <span>{transaction_date}</span>
+              <span>{transaction_time}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Download Button */}
+        <div className="download-area">
+          <button className="btn btn-primary" onClick={downloadPdf} data-testid="download-shared-pdf">
+            <Download size={16} />
+            Download PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main App with Router
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<ReceiptBuilder />} />
+        <Route path="/receipt/:receiptId" element={<SharedReceiptView />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
