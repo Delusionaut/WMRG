@@ -1160,10 +1160,7 @@ function SharedReceiptView() {
 
           {/* Date/Time */}
           <div className="receipt-center receipt-datetime">
-            <div className="receipt-datetime-line">
-              <span>{transaction_date}</span>
-              <span>{transaction_time}</span>
-            </div>
+            <div>{transaction_date}          {transaction_time}</div>
           </div>
 
           {/* Items Sold - Large */}
@@ -1191,19 +1188,8 @@ function SharedReceiptView() {
           {/* Footer */}
           <div className="receipt-center receipt-footer">
             <div>Low Prices You Can Trust. Every Day.</div>
-            <div className="receipt-datetime-line" style={{marginTop: '4px'}}>
-              <span>{transaction_date}</span>
-              <span>{transaction_time}</span>
-            </div>
+            <div>{transaction_date}          {transaction_time}</div>
           </div>
-        </div>
-
-        {/* Download Button */}
-        <div className="download-area">
-          <button className="btn btn-primary" onClick={downloadPdf} data-testid="download-shared-pdf">
-            <Download size={16} />
-            Download PDF
-          </button>
         </div>
       </div>
     </div>
