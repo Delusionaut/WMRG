@@ -266,6 +266,198 @@ class WalmartReceiptAPITester:
                 "error": str(e)
             })
 
+    def test_save_load_receipts(self):
+        """Test save/load receipt functionality"""
+        print("\n=== Testing Save/Load Receipts ===")
+        
+        # Sample receipt data for saving
+        receipt_data = {
+            "name": "Test Receipt Save",
+            "store_details": {
+                "store_type": "WM Supercenter",
+                "phone": "951-845-1529",
+                "manager_name": "JESSICA",
+                "address_line1": "1540 E 2ND ST",
+                "city": "BEAUMONT",
+                "state": "CA",
+                "zip_code": "92223",
+                "store_number": "05156",
+                "op_number": "004985",
+                "te_number": "01",
+                "tr_number": "00373"
+            },
+            "items": [
+                {
+                    "id": "test1",
+                    "name": "TEST ITEM",
+                    "upc": "012000073496",
+                    "price": 1.99,
+                    "quantity": 1,
+                    "is_taxable": True,
+                    "tax_flag": "X",
+                    "is_voided": False
+                }
+            ],
+            "tax_rate": 7.750,
+            "payment_details": {
+                "payment_method": "DEBIT",
+                "card_last_four": "2593",
+                "cash_back": 0.00,
+                "ref_number": "512400787256",
+                "network_id": "0069",
+                "approval_code": "811595",
+                "aid": "A0000000042203",
+                "aac": "CCE1EA26C32C0D8A",
+                "terminal_number": "53026334"
+            },
+            "transaction_date": "05/03/25",
+            "transaction_time": "17:34:15",
+            "tc_number": "1234 5678 9012 3456 7890"
+        }
+        
+        # Test save receipt
+        success, save_response = self.run_test(
+            "Save Receipt",
+            "POST",
+            "receipts/save",
+            200,
+            data=receipt_data
+        )
+        
+        receipt_id = None
+        if success and 'receipt_id' in save_response:
+            receipt_id = save_response['receipt_id']
+            print(f"   Saved receipt ID: {receipt_id}")
+        
+        # Test list saved receipts
+        success, list_response = self.run_test(
+            "List Saved Receipts",
+            "GET",
+            "receipts/saved",
+            200
+        )
+        
+        if success:
+            receipts = list_response.get('receipts', [])
+            print(f"   Found {len(receipts)} saved receipts")
+        
+        # Test get specific saved receipt
+        if receipt_id:
+            success, get_response = self.run_test(
+                "Get Saved Receipt",
+                "GET",
+                f"receipts/saved/{receipt_id}",
+                200
+            )
+            
+            if success:
+                print(f"   Retrieved receipt name: {get_response.get('name')}")
+        
+        # Test update saved receipt
+        if receipt_id:
+            updated_data = receipt_data.copy()
+            updated_data['name'] = "Updated Test Receipt"
+            
+            success, update_response = self.run_test(
+                "Update Saved Receipt",
+                "PUT",
+                f"receipts/saved/{receipt_id}",
+                200,
+                data=updated_data
+            )
+        
+        # Test delete saved receipt
+        if receipt_id:
+            success, delete_response = self.run_test(
+                "Delete Saved Receipt",
+                "DELETE",
+                f"receipts/saved/{receipt_id}",
+                200
+            )
+
+    def test_share_receipts(self):
+        """Test share receipt functionality"""
+        print("\n=== Testing Share Receipts ===")
+        
+        # Sample receipt data for sharing
+        share_data = {
+            "store_details": {
+                "store_type": "WM Supercenter",
+                "phone": "951-845-1529",
+                "manager_name": "JESSICA",
+                "address_line1": "1540 E 2ND ST",
+                "city": "BEAUMONT",
+                "state": "CA",
+                "zip_code": "92223",
+                "store_number": "05156",
+                "op_number": "004985",
+                "te_number": "01",
+                "tr_number": "00373"
+            },
+            "items": [
+                {
+                    "id": "test1",
+                    "name": "SHARED ITEM",
+                    "upc": "012000073496",
+                    "price": 2.99,
+                    "quantity": 1,
+                    "is_taxable": True,
+                    "tax_flag": "X",
+                    "is_voided": False
+                }
+            ],
+            "tax_rate": 7.750,
+            "payment_details": {
+                "payment_method": "DEBIT",
+                "card_last_four": "2593",
+                "cash_back": 0.00,
+                "ref_number": "512400787256",
+                "network_id": "0069",
+                "approval_code": "811595",
+                "aid": "A0000000042203",
+                "aac": "CCE1EA26C32C0D8A",
+                "terminal_number": "53026334"
+            },
+            "transaction_date": "05/03/25",
+            "transaction_time": "17:34:15",
+            "tc_number": "1234 5678 9012 3456 7890",
+            "totals": {
+                "subtotal": "2.99",
+                "tax_amount": "0.23",
+                "total": "3.22",
+                "item_count": 1,
+                "debit_tend": "3.22",
+                "total_debit_purchase": "3.22",
+                "change_due": "0.00"
+            }
+        }
+        
+        # Test share receipt
+        success, share_response = self.run_test(
+            "Share Receipt",
+            "POST",
+            "receipts/share",
+            200,
+            data=share_data
+        )
+        
+        shared_receipt_id = None
+        if success and 'receipt_id' in share_response:
+            shared_receipt_id = share_response['receipt_id']
+            print(f"   Shared receipt ID: {shared_receipt_id}")
+        
+        # Test get shared receipt
+        if shared_receipt_id:
+            success, get_shared_response = self.run_test(
+                "Get Shared Receipt",
+                "GET",
+                f"receipts/shared/{shared_receipt_id}",
+                200
+            )
+            
+            if success:
+                print(f"   Retrieved shared receipt with {len(get_shared_response.get('items', []))} items")
+
     def test_edge_cases(self):
         """Test edge cases and error handling"""
         print("\n=== Testing Edge Cases ===")
@@ -318,6 +510,22 @@ class WalmartReceiptAPITester:
             "receipts/calculate",
             422,  # Validation error expected
             data={"invalid": "data"}
+        )
+        
+        # Test get non-existent saved receipt
+        self.run_test(
+            "Get Non-existent Saved Receipt",
+            "GET",
+            "receipts/saved/nonexistent",
+            404
+        )
+        
+        # Test get non-existent shared receipt
+        self.run_test(
+            "Get Non-existent Shared Receipt",
+            "GET",
+            "receipts/shared/nonexistent",
+            404
         )
 
 def main():
