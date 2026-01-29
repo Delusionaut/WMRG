@@ -850,10 +850,7 @@ function ReceiptBuilder() {
 
             {/* Date/Time and Items Sold */}
             <div className="receipt-center receipt-datetime">
-              <div className="receipt-datetime-line">
-                <span>{dateTime.date}</span>
-                <span>{dateTime.time}</span>
-              </div>
+              <div>{dateTime.date}          {dateTime.time}</div>
             </div>
 
             {/* Items Sold - Large and Centered */}
