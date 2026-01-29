@@ -389,6 +389,62 @@
   margin-top: 1.5rem;
   display: flex;
   gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Shared Receipt Page */
+.shared-receipt-page {
+  min-height: 100vh;
+  background: #E5E7EB;
+  display: flex;
+  flex-direction: column;
+}
+
+.shared-receipt-header {
+  background: #0071DC;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.shared-receipt-header h1 {
+  color: white;
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.back-btn,
+.share-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.back-btn:hover,
+.share-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.shared-receipt-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
 }
 
 /* Responsive adjustments */
