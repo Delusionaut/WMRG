@@ -329,7 +329,7 @@ function ReceiptBuilder() {
       const receiptId = response.data.receipt_id;
       const shareUrl = `${window.location.origin}/receipt/${receiptId}`;
       
-      // Try native share, fallback to clipboard
+      // Try native share first, fallback to clipboard
       if (navigator.share) {
         try {
           await navigator.share({
@@ -337,13 +337,19 @@ function ReceiptBuilder() {
             text: 'View my Walmart receipt',
             url: shareUrl
           });
+          return;
         } catch (err) {
-          navigator.clipboard.writeText(shareUrl);
-          alert(`Link copied to clipboard!\n${shareUrl}`);
+          // User cancelled or not supported, try clipboard
         }
-      } else {
-        navigator.clipboard.writeText(shareUrl);
+      }
+      
+      // Try clipboard API with fallback
+      try {
+        await navigator.clipboard.writeText(shareUrl);
         alert(`Link copied to clipboard!\n${shareUrl}`);
+      } catch (clipErr) {
+        // Clipboard not available, show URL in prompt for manual copy
+        prompt('Copy this link to share:', shareUrl);
       }
     } catch (error) {
       console.error('Share error:', error);
