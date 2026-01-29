@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { BrowserRouter, Routes, Route, useParams, useNavigate } from "react-router-dom";
 import "./App.css";
 import axios from "axios";
 import Barcode from "react-barcode";
@@ -17,7 +18,10 @@ import {
   Loader2,
   Check,
   X,
-  FileText
+  FileText,
+  Share2,
+  ChevronLeft,
+  Upload
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
