@@ -540,6 +540,8 @@ def main():
     tester.test_upc_lookup()
     tester.test_receipt_calculation()
     tester.test_pdf_generation()
+    tester.test_save_load_receipts()
+    tester.test_share_receipts()
     tester.test_edge_cases()
     
     # Print final results
