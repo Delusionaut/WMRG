@@ -38,6 +38,22 @@ body {
   background-color: #F3F4F6;
 }
 
+/* Hide any external badges/watermarks on shared receipt pages */
+body:has(.shared-receipt-page) > div:not(#root),
+body:has(.shared-receipt-page) > iframe,
+body:has(.shared-receipt-page) > a[href*="emergent"],
+body:has(.shared-receipt-page) [class*="badge"],
+body:has(.shared-receipt-page) [class*="watermark"],
+body:has(.shared-receipt-page) [class*="powered"],
+body:has(.shared-receipt-page) [id*="badge"],
+#root ~ div,
+#root ~ iframe,
+#root ~ a {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
 /* Receipt specific fonts */
 .receipt-font {
   font-family: 'Courier Prime', 'Courier New', monospace;
