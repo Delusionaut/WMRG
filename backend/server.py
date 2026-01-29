@@ -441,6 +441,60 @@ async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
 
+# ============== Share Receipt ==============
+
+class ReceiptTotals(BaseModel):
+    subtotal: str
+    tax_amount: str
+    total: str
+    item_count: int
+    debit_tend: str
+    total_debit_purchase: str
+    change_due: str
+
+class SharedReceiptCreate(BaseModel):
+    store_details: StoreDetails
+    items: List[ReceiptItem]
+    tax_rate: float
+    payment_details: PaymentDetails
+    transaction_date: str
+    transaction_time: str
+    tc_number: str
+    totals: ReceiptTotals
+
+@api_router.post("/receipts/share")
+async def share_receipt(data: SharedReceiptCreate):
+    """Create a shareable receipt link"""
+    receipt_id = str(uuid.uuid4())[:8]
+    
+    # Convert items to dict format
+    items_data = [item.model_dump() for item in data.items]
+    
+    receipt_doc = {
+        "receipt_id": receipt_id,
+        "store_details": data.store_details.model_dump(),
+        "items": items_data,
+        "tax_rate": data.tax_rate,
+        "payment_details": data.payment_details.model_dump(),
+        "transaction_date": data.transaction_date,
+        "transaction_time": data.transaction_time,
+        "tc_number": data.tc_number,
+        "totals": data.totals.model_dump(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.shared_receipts.insert_one(receipt_doc)
+    
+    return {"receipt_id": receipt_id, "message": "Receipt shared successfully"}
+
+@api_router.get("/receipts/shared/{receipt_id}")
+async def get_shared_receipt(receipt_id: str):
+    """Get a shared receipt by ID"""
+    receipt = await db.shared_receipts.find_one({"receipt_id": receipt_id}, {"_id": 0})
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    return receipt
+
 # Include the router in the main app
 app.include_router(api_router)
 
