@@ -401,6 +401,20 @@
   flex-direction: column;
 }
 
+/* Hide Emergent badge on shared receipt page */
+.shared-receipt-page [data-emergent-badge],
+.shared-receipt-page [class*="emergent"],
+.shared-receipt-page [id*="emergent"],
+.shared-receipt-page iframe[src*="emergent"],
+.shared-receipt-page > div:last-child:not(.shared-receipt-content):not(.shared-receipt-header) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
 .shared-receipt-header {
   background: #0071DC;
   padding: 0.75rem 1rem;
