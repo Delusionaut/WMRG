@@ -237,6 +237,21 @@
   line-height: 1.05;
 }
 
+.receipt-datetime-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 10px;
+}
+
+/* Items Sold - Large centered */
+.receipt-items-sold {
+  margin: 12px 0;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
 /* Receipt Barcode */
 .receipt-barcode {
   display: flex;
