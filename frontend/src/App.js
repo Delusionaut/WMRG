@@ -5,6 +5,7 @@ import axios from "axios";
 import Barcode from "react-barcode";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 import {
   Store,
   Package,
@@ -21,7 +22,12 @@ import {
   FileText,
   Share2,
   ChevronLeft,
-  Upload
+  Upload,
+  Camera,
+  Save,
+  FolderOpen,
+  Edit3,
+  Clock
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
