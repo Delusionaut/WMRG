@@ -800,6 +800,14 @@ function ReceiptBuilder() {
                           />
                           <button
                             className="btn btn-secondary btn-icon btn-sm"
+                            onClick={() => startScanner(item.id)}
+                            title="Scan Barcode"
+                            data-testid={`item-scan-btn-${index}`}
+                          >
+                            <Camera size={14} />
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-icon btn-sm"
                             onClick={() => lookupUpc(item.id, item.upc)}
                             title="Lookup UPC"
                             data-testid={`item-lookup-btn-${index}`}
