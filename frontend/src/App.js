@@ -277,6 +277,61 @@ function ReceiptBuilder() {
     setIsGeneratingPdf(false);
   };
 
+  // Share receipt
+  const shareReceipt = async () => {
+    if (items.length === 0) {
+      alert('Please add at least one item to share the receipt.');
+      return;
+    }
+
+    setIsGeneratingPdf(true);
+    try {
+      const totalsData = calculateTotals();
+      const response = await axios.post(`${API}/receipts/share`, {
+        store_details: storeDetails,
+        items: items,
+        tax_rate: taxRate,
+        payment_details: paymentDetails,
+        transaction_date: dateTime.date,
+        transaction_time: dateTime.time,
+        tc_number: tcNumber,
+        totals: {
+          subtotal: totalsData.subtotal,
+          tax_amount: totalsData.taxAmount,
+          total: totalsData.total,
+          item_count: totalsData.itemCount,
+          debit_tend: totalsData.debitTend,
+          total_debit_purchase: totalsData.totalDebitPurchase,
+          change_due: totalsData.changeDue
+        }
+      });
+
+      const receiptId = response.data.receipt_id;
+      const shareUrl = `${window.location.origin}/receipt/${receiptId}`;
+      
+      // Try native share, fallback to clipboard
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'Walmart Receipt',
+            text: 'View my Walmart receipt',
+            url: shareUrl
+          });
+        } catch (err) {
+          navigator.clipboard.writeText(shareUrl);
+          alert(`Link copied to clipboard!\n${shareUrl}`);
+        }
+      } else {
+        navigator.clipboard.writeText(shareUrl);
+        alert(`Link copied to clipboard!\n${shareUrl}`);
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+      alert('Error sharing receipt. Please try again.');
+    }
+    setIsGeneratingPdf(false);
+  };
+
   // Reset form
   const resetForm = () => {
     setStoreDetails(defaultStoreDetails);
