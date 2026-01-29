@@ -878,10 +878,7 @@ function ReceiptBuilder() {
             {/* Footer */}
             <div className="receipt-center receipt-footer">
               <div>Low Prices You Can Trust. Every Day.</div>
-              <div className="receipt-datetime-line" style={{marginTop: '4px'}}>
-                <span>{dateTime.date}</span>
-                <span>{dateTime.time}</span>
-              </div>
+              <div>{dateTime.date}          {dateTime.time}</div>
             </div>
           </div>
 
