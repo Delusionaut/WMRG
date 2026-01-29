@@ -495,6 +495,95 @@ async def get_shared_receipt(receipt_id: str):
         raise HTTPException(status_code=404, detail="Receipt not found")
     return receipt
 
+# ============== Save/Load Receipts ==============
+
+class SavedReceiptCreate(BaseModel):
+    name: str
+    store_details: StoreDetails
+    items: List[ReceiptItem]
+    tax_rate: float
+    payment_details: PaymentDetails
+    transaction_date: str
+    transaction_time: str
+    tc_number: str
+
+@api_router.post("/receipts/save")
+async def save_receipt(data: SavedReceiptCreate):
+    """Save a receipt to database"""
+    receipt_id = str(uuid.uuid4())[:8]
+    
+    items_data = [item.model_dump() for item in data.items]
+    
+    receipt_doc = {
+        "receipt_id": receipt_id,
+        "name": data.name,
+        "store_details": data.store_details.model_dump(),
+        "items": items_data,
+        "tax_rate": data.tax_rate,
+        "payment_details": data.payment_details.model_dump(),
+        "transaction_date": data.transaction_date,
+        "transaction_time": data.transaction_time,
+        "tc_number": data.tc_number,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.saved_receipts.insert_one(receipt_doc)
+    
+    return {"receipt_id": receipt_id, "message": "Receipt saved successfully"}
+
+@api_router.get("/receipts/saved")
+async def list_saved_receipts():
+    """List all saved receipts"""
+    receipts = await db.saved_receipts.find(
+        {}, 
+        {"_id": 0, "receipt_id": 1, "name": 1, "created_at": 1, "updated_at": 1, "transaction_date": 1}
+    ).sort("updated_at", -1).to_list(100)
+    return {"receipts": receipts}
+
+@api_router.get("/receipts/saved/{receipt_id}")
+async def get_saved_receipt(receipt_id: str):
+    """Get a saved receipt by ID"""
+    receipt = await db.saved_receipts.find_one({"receipt_id": receipt_id}, {"_id": 0})
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    return receipt
+
+@api_router.put("/receipts/saved/{receipt_id}")
+async def update_saved_receipt(receipt_id: str, data: SavedReceiptCreate):
+    """Update a saved receipt"""
+    items_data = [item.model_dump() for item in data.items]
+    
+    update_doc = {
+        "name": data.name,
+        "store_details": data.store_details.model_dump(),
+        "items": items_data,
+        "tax_rate": data.tax_rate,
+        "payment_details": data.payment_details.model_dump(),
+        "transaction_date": data.transaction_date,
+        "transaction_time": data.transaction_time,
+        "tc_number": data.tc_number,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    result = await db.saved_receipts.update_one(
+        {"receipt_id": receipt_id},
+        {"$set": update_doc}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    
+    return {"message": "Receipt updated successfully"}
+
+@api_router.delete("/receipts/saved/{receipt_id}")
+async def delete_saved_receipt(receipt_id: str):
+    """Delete a saved receipt"""
+    result = await db.saved_receipts.delete_one({"receipt_id": receipt_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    return {"message": "Receipt deleted successfully"}
+
 # Include the router in the main app
 app.include_router(api_router)
 
