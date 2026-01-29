@@ -124,6 +124,20 @@ function ReceiptBuilder() {
   const [dateTime, setDateTime] = useState(getCurrentDateTime());
   const [upcLookupStatus, setUpcLookupStatus] = useState({});
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  
+  // Scanner state
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerItemId, setScannerItemId] = useState(null);
+  const videoRef = useRef(null);
+  const codeReaderRef = useRef(null);
+  
+  // Save/Load state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [receiptName, setReceiptName] = useState("");
+  const [savedReceipts, setSavedReceipts] = useState([]);
+  const [currentReceiptId, setCurrentReceiptId] = useState(null);
+  const [loadingReceipts, setLoadingReceipts] = useState(false);
 
   const receiptRef = useRef(null);
 
