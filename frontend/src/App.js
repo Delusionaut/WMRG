@@ -108,7 +108,8 @@ const getCurrentDateTime = () => {
   return { date, time };
 };
 
-function App() {
+function ReceiptBuilder() {
+  const navigate = useNavigate();
   const [storeDetails, setStoreDetails] = useState(defaultStoreDetails);
   const [items, setItems] = useState([]);
   const [taxRate, setTaxRate] = useState(7.750);
