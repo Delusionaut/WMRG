@@ -360,24 +360,291 @@ function ReceiptBuilder() {
     setPaymentDetails(defaultPaymentDetails);
     setTcNumber(generateTcNumber());
     setDateTime(getCurrentDateTime());
+    setCurrentReceiptId(null);
+    setReceiptName("");
+  };
+
+  // ============== Barcode Scanner ==============
+  const startScanner = async (itemId) => {
+    setScannerItemId(itemId);
+    setShowScanner(true);
+    
+    try {
+      codeReaderRef.current = new BrowserMultiFormatReader();
+      const videoInputDevices = await BrowserMultiFormatReader.listVideoInputDevices();
+      
+      if (videoInputDevices.length === 0) {
+        alert('No camera found. Please ensure camera permissions are granted.');
+        setShowScanner(false);
+        return;
+      }
+      
+      // Prefer back camera on mobile
+      const backCamera = videoInputDevices.find(device => 
+        device.label.toLowerCase().includes('back') || 
+        device.label.toLowerCase().includes('rear')
+      );
+      const deviceId = backCamera ? backCamera.deviceId : videoInputDevices[0].deviceId;
+      
+      await codeReaderRef.current.decodeFromVideoDevice(
+        deviceId,
+        videoRef.current,
+        (result, error) => {
+          if (result) {
+            const scannedUpc = result.getText();
+            updateItem(itemId, 'upc', scannedUpc);
+            lookupUpc(itemId, scannedUpc);
+            stopScanner();
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Scanner error:', error);
+      alert('Error accessing camera. Please check permissions.');
+      setShowScanner(false);
+    }
+  };
+
+  const stopScanner = () => {
+    if (codeReaderRef.current) {
+      codeReaderRef.current.reset();
+      codeReaderRef.current = null;
+    }
+    setShowScanner(false);
+    setScannerItemId(null);
+  };
+
+  // ============== Save/Load Receipts ==============
+  const fetchSavedReceipts = async () => {
+    setLoadingReceipts(true);
+    try {
+      const response = await axios.get(`${API}/receipts/saved`);
+      setSavedReceipts(response.data.receipts);
+    } catch (error) {
+      console.error('Error fetching receipts:', error);
+    }
+    setLoadingReceipts(false);
+  };
+
+  const saveReceipt = async () => {
+    if (!receiptName.trim()) {
+      alert('Please enter a name for this receipt.');
+      return;
+    }
+
+    try {
+      const receiptData = {
+        name: receiptName,
+        store_details: storeDetails,
+        items: items,
+        tax_rate: taxRate,
+        payment_details: paymentDetails,
+        transaction_date: dateTime.date,
+        transaction_time: dateTime.time,
+        tc_number: tcNumber
+      };
+
+      if (currentReceiptId) {
+        await axios.put(`${API}/receipts/saved/${currentReceiptId}`, receiptData);
+        alert('Receipt updated successfully!');
+      } else {
+        const response = await axios.post(`${API}/receipts/save`, receiptData);
+        setCurrentReceiptId(response.data.receipt_id);
+        alert('Receipt saved successfully!');
+      }
+      setShowSaveModal(false);
+    } catch (error) {
+      console.error('Save error:', error);
+      alert('Error saving receipt. Please try again.');
+    }
+  };
+
+  const loadReceipt = async (receiptId) => {
+    try {
+      const response = await axios.get(`${API}/receipts/saved/${receiptId}`);
+      const data = response.data;
+      
+      setStoreDetails(data.store_details);
+      setItems(data.items.map(item => ({ ...item, id: item.id || generateId() })));
+      setTaxRate(data.tax_rate);
+      setPaymentDetails(data.payment_details);
+      setDateTime({ date: data.transaction_date, time: data.transaction_time });
+      setTcNumber(data.tc_number);
+      setCurrentReceiptId(receiptId);
+      setReceiptName(data.name);
+      
+      setShowLoadModal(false);
+    } catch (error) {
+      console.error('Load error:', error);
+      alert('Error loading receipt. Please try again.');
+    }
+  };
+
+  const deleteReceipt = async (receiptId) => {
+    if (!window.confirm('Are you sure you want to delete this receipt?')) return;
+    
+    try {
+      await axios.delete(`${API}/receipts/saved/${receiptId}`);
+      fetchSavedReceipts();
+      if (currentReceiptId === receiptId) {
+        setCurrentReceiptId(null);
+        setReceiptName("");
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Error deleting receipt. Please try again.');
+    }
+  };
+
+  const openLoadModal = () => {
+    fetchSavedReceipts();
+    setShowLoadModal(true);
   };
 
   return (
     <div className="app-container">
+      {/* Barcode Scanner Modal */}
+      {showScanner && (
+        <div className="scanner-modal" data-testid="scanner-modal">
+          <div className="scanner-container">
+            <div className="scanner-header">
+              <h3>Scan Barcode</h3>
+              <button onClick={stopScanner} className="close-btn" data-testid="close-scanner-btn">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="scanner-video-container">
+              <video ref={videoRef} className="scanner-video" />
+              <div className="scanner-overlay">
+                <div className="scanner-target"></div>
+              </div>
+            </div>
+            <p className="scanner-hint">Point camera at barcode</p>
+          </div>
+        </div>
+      )}
+
+      {/* Save Receipt Modal */}
+      {showSaveModal && (
+        <div className="modal-overlay" data-testid="save-modal">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3><Save size={20} /> Save Receipt</h3>
+              <button onClick={() => setShowSaveModal(false)} className="close-btn">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="form-label">Receipt Name</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Grocery Shopping 01/29"
+                value={receiptName}
+                onChange={(e) => setReceiptName(e.target.value)}
+                data-testid="receipt-name-input"
+              />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowSaveModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={saveReceipt} data-testid="confirm-save-btn">
+                <Save size={16} />
+                {currentReceiptId ? 'Update' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Load Receipt Modal */}
+      {showLoadModal && (
+        <div className="modal-overlay" data-testid="load-modal">
+          <div className="modal-content modal-lg">
+            <div className="modal-header">
+              <h3><FolderOpen size={20} /> Load Receipt</h3>
+              <button onClick={() => setShowLoadModal(false)} className="close-btn">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {loadingReceipts ? (
+                <div className="text-center py-8">
+                  <Loader2 size={32} className="animate-spin mx-auto text-blue-600" />
+                </div>
+              ) : savedReceipts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <FolderOpen size={48} className="mx-auto mb-2 opacity-50" />
+                  <p>No saved receipts</p>
+                </div>
+              ) : (
+                <div className="receipt-list">
+                  {savedReceipts.map((receipt) => (
+                    <div key={receipt.receipt_id} className="receipt-list-item" data-testid={`receipt-item-${receipt.receipt_id}`}>
+                      <div className="receipt-list-info">
+                        <span className="receipt-list-name">{receipt.name}</span>
+                        <span className="receipt-list-date">
+                          <Clock size={12} /> {receipt.transaction_date}
+                        </span>
+                      </div>
+                      <div className="receipt-list-actions">
+                        <button 
+                          className="btn btn-primary btn-sm"
+                          onClick={() => loadReceipt(receipt.receipt_id)}
+                          data-testid={`load-receipt-${receipt.receipt_id}`}
+                        >
+                          <FolderOpen size={14} /> Load
+                        </button>
+                        <button 
+                          className="btn btn-danger btn-sm"
+                          onClick={() => deleteReceipt(receipt.receipt_id)}
+                          data-testid={`delete-receipt-${receipt.receipt_id}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="app-header">
         <div className="header-logo">
           <span className="spark">✦</span>
           <h1>Walmart Receipt Generator</h1>
         </div>
-        <button
-          className="btn btn-secondary"
-          onClick={resetForm}
-          data-testid="reset-form-btn"
-        >
-          <RotateCcw size={16} />
-          Reset
-        </button>
+        <div className="header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={openLoadModal}
+            data-testid="load-receipt-btn"
+          >
+            <FolderOpen size={16} />
+            Load
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowSaveModal(true)}
+            data-testid="save-receipt-btn"
+          >
+            <Save size={16} />
+            Save
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={resetForm}
+            data-testid="reset-form-btn"
+          >
+            <RotateCcw size={16} />
+            Reset
+          </button>
+        </div>
       </header>
 
       <div className="main-content">
