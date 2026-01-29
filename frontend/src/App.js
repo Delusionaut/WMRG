@@ -1,52 +1,854 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import React, { useState, useCallback, useRef } from "react";
+import "./App.css";
 import axios from "axios";
+import Barcode from "react-barcode";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import {
+  Store,
+  Package,
+  CreditCard,
+  Calculator,
+  Plus,
+  Trash2,
+  Search,
+  Download,
+  RotateCcw,
+  Loader2,
+  Check,
+  X,
+  FileText
+} from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+// Default values
+const defaultStoreDetails = {
+  store_type: "WM Supercenter",
+  phone: "951-845-1529",
+  manager_name: "JESSICA",
+  address_line1: "1540 E 2ND ST",
+  city: "BEAUMONT",
+  state: "CA",
+  zip_code: "92223",
+  store_number: "05156",
+  op_number: "004985",
+  te_number: "01",
+  tr_number: "00373"
+};
+
+const defaultPaymentDetails = {
+  payment_method: "DEBIT",
+  card_last_four: "2593",
+  cash_back: 80.00,
+  ref_number: "512400787256",
+  network_id: "0069",
+  approval_code: "811595",
+  aid: "A0000000042203",
+  aac: "CCE1EA26C32C0D8A",
+  terminal_number: "53026334"
+};
+
+// Walmart logo as base64 data URL for PDF generation
+const WALMART_LOGO_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAccAAACVCAMAAAAaE8HIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAwBQTFRF/////f39+fn58/Pz8PDw9fX1/Pz8/v7+7e3txMTEkJCQaWlpZ2dnampqdnZ2o6Oj5eXl+vr66+vru7u7enp6Ozs7ExMTERERFBQUICAgTk5OnJyc2tra+Pj4wMDAcnJyMTExDAwMAAAABAQEQEBApaWl5+fn+/v76OjogICANDQ0DQ0Nurq68fHx4uLiVVVVFhYWREREmZmZ6urqRUVFmpqa5OTkYmJiHh4eBgYGDw8PT09PpKSk7Ozs5ubmc3NzKysrCgoKEhISXl5esrKy7+/viIiIOjo6b29vwsLCmJiYRkZGGRkZfX19z8/P9vb2qqqqU1NTHBwci4uL3d3d8vLyvr6+YWFhGhoaHx8f0NDQbm5uISEh4ODgeXl5IiIiqKiohYWFJSUlJycnjo6OKCgoj4+PAgICKSkpq6ur3t7e0tLS2NjY9/f3CAgIr6+v1NTU2dnZ9PT07u7uiYmJZWVloqKiAQEBQkJCtra2y8vLhoaGd3d3n5+fzMzMh4eHW1tbWFhY29vbX19fl5eXWlpaycnJWVlZe3t7ubm5XV1df39/kZGRNTU1KioqSEhIdXV1kpKSUVFRvb29oaGhMDAwEBAQt7e3rq6ulpaWMzMzxsbGcHBws7OzPT09CwsLBQUFAwMDCQkJHR0dxcXFlJSUT19f1dXVPj4+BwcHm5ubv7+/w8PDa2trra2tQUFBFRUVQ0NDyMjIDg4Ozc3NqampZmZmvLy8SUlJfHx809PTbGxsODg4np6erKysUFBQ1tbWTExMIyMjnZ2dgYGBYGBgzs7OOTk5wcHBysrKjY2N3NzcbW1toKCgZGRkLy8vV1dXuLi4GBgYVFRULi4uS0tLfn5+0dHRFxcXPz8/goKCioqKk5OT4eHh19fX39/fsbGx6enppqamdHR0JiYmtbW1lZWVcXFxaGhoGxsbNjY2x8fHjIyMp6enhISESkpKVlZWeHh4LS0tLCwsUlJSNzc3XFxctLS0R0dHsLCwMjIyJCQk4+PjY2Njg4ODPDw8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// Generate realistic UPC code (12 digits with valid check digit)
+const generateUPC = () => {
+  const digits = [];
+  // Generate first 11 random digits
+  for (let i = 0; i < 11; i++) {
+    digits.push(Math.floor(Math.random() * 10));
+  }
+  // Calculate check digit (UPC-A algorithm)
+  let oddSum = 0;
+  let evenSum = 0;
+  for (let i = 0; i < 11; i++) {
+    if (i % 2 === 0) {
+      oddSum += digits[i];
+    } else {
+      evenSum += digits[i];
     }
-  };
+  }
+  const checkDigit = (10 - ((oddSum * 3 + evenSum) % 10)) % 10;
+  digits.push(checkDigit);
+  return digits.join('');
+};
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+const generateTcNumber = () => {
+  const parts = [
+    Math.floor(1000 + Math.random() * 9000),
+    Math.floor(1000 + Math.random() * 9000).toString().padStart(4, '0'),
+    Math.floor(1000 + Math.random() * 9000),
+    Math.floor(1000 + Math.random() * 9000),
+    Math.floor(1000 + Math.random() * 9000)
+  ];
+  return parts.join(" ");
+};
 
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
+const getCurrentDateTime = () => {
+  const now = new Date();
+  const date = now.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: '2-digit'
+  }).replace(/\//g, '/');
+  const time = now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  return { date, time };
 };
 
 function App() {
+  const [storeDetails, setStoreDetails] = useState(defaultStoreDetails);
+  const [items, setItems] = useState([]);
+  const [taxRate, setTaxRate] = useState(7.750);
+  const [paymentDetails, setPaymentDetails] = useState(defaultPaymentDetails);
+  const [tcNumber, setTcNumber] = useState(generateTcNumber());
+  const [dateTime, setDateTime] = useState(getCurrentDateTime());
+  const [upcLookupStatus, setUpcLookupStatus] = useState({});
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const receiptRef = useRef(null);
+
+  // Calculate totals
+  const calculateTotals = useCallback(() => {
+    let subtotal = 0;
+    let itemCount = 0;
+    let taxableTotal = 0;
+
+    items.forEach(item => {
+      if (!item.is_voided) {
+        const itemTotal = item.price * item.quantity;
+        subtotal += itemTotal;
+        itemCount += item.quantity;
+        if (item.is_taxable) {
+          taxableTotal += itemTotal;
+        }
+      }
+    });
+
+    const taxAmount = Math.round(taxableTotal * (taxRate / 100) * 100) / 100;
+    const total = Math.round((subtotal + taxAmount) * 100) / 100;
+    const debitTend = total;
+    const totalDebitPurchase = Math.round((total + paymentDetails.cash_back) * 100) / 100;
+    const changeDue = paymentDetails.cash_back;
+
+    return {
+      subtotal: subtotal.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      total: total.toFixed(2),
+      itemCount,
+      debitTend: debitTend.toFixed(2),
+      totalDebitPurchase: totalDebitPurchase.toFixed(2),
+      changeDue: changeDue.toFixed(2)
+    };
+  }, [items, taxRate, paymentDetails.cash_back]);
+
+  const totals = calculateTotals();
+
+  // Add new item
+  const addItem = () => {
+    const newItem = {
+      id: generateId(),
+      name: "",
+      upc: generateUPC(),
+      price: 0,
+      quantity: 1,
+      is_taxable: true,
+      tax_flag: "X",
+      is_voided: false
+    };
+    setItems([...items, newItem]);
+  };
+
+  // Update item
+  const updateItem = (id, field, value) => {
+    setItems(items.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  // Remove item
+  const removeItem = (id) => {
+    setItems(items.filter(item => item.id !== id));
+  };
+
+  // Toggle void
+  const toggleVoid = (id) => {
+    setItems(items.map(item =>
+      item.id === id ? { ...item, is_voided: !item.is_voided } : item
+    ));
+  };
+
+  // UPC Lookup
+  const lookupUpc = async (itemId, upc) => {
+    if (!upc || upc.length < 8) return;
+
+    setUpcLookupStatus(prev => ({ ...prev, [itemId]: 'loading' }));
+
+    try {
+      const response = await axios.get(`${API}/products/lookup/${upc}`);
+      if (response.data.success && response.data.title) {
+        updateItem(itemId, 'name', response.data.title.substring(0, 14));
+        setUpcLookupStatus(prev => ({ ...prev, [itemId]: 'success' }));
+      } else {
+        setUpcLookupStatus(prev => ({ ...prev, [itemId]: 'not_found' }));
+      }
+    } catch (error) {
+      console.error('UPC lookup error:', error);
+      setUpcLookupStatus(prev => ({ ...prev, [itemId]: 'error' }));
+    }
+
+    setTimeout(() => {
+      setUpcLookupStatus(prev => ({ ...prev, [itemId]: null }));
+    }, 3000);
+  };
+
+  // Generate PDF using html2canvas + jspdf - 80mm width thermal receipt
+  const generatePdfClient = async () => {
+    if (!receiptRef.current) return;
+
+    setIsGeneratingPdf(true);
+    try {
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 3,
+        backgroundColor: '#ffffff',
+        useCORS: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      // 80mm width for thermal receipt, height proportional
+      const pdfWidth = 80;
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`walmart_receipt_${tcNumber.replace(/ /g, '_')}.pdf`);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+    setIsGeneratingPdf(false);
+  };
+
+  // Generate PDF via backend
+  const generatePdfBackend = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const response = await axios.post(`${API}/receipts/generate-pdf`, {
+        store_details: storeDetails,
+        items: items,
+        tax_rate: taxRate,
+        payment_details: paymentDetails,
+        transaction_date: dateTime.date,
+        transaction_time: dateTime.time
+      }, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `walmart_receipt_${tcNumber.replace(/ /g, '_')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+    setIsGeneratingPdf(false);
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setStoreDetails(defaultStoreDetails);
+    setItems([]);
+    setTaxRate(7.750);
+    setPaymentDetails(defaultPaymentDetails);
+    setTcNumber(generateTcNumber());
+    setDateTime(getCurrentDateTime());
+  };
+
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+    <div className="app-container">
+      {/* Header */}
+      <header className="app-header">
+        <div className="header-logo">
+          <span className="spark">✦</span>
+          <h1>Walmart Receipt Generator</h1>
+        </div>
+        <button
+          className="btn btn-secondary"
+          onClick={resetForm}
+          data-testid="reset-form-btn"
+        >
+          <RotateCcw size={16} />
+          Reset
+        </button>
+      </header>
+
+      <div className="main-content">
+        {/* Builder Panel */}
+        <div className="builder-panel">
+          {/* Store Details Section */}
+          <div className="form-section">
+            <h3 className="form-section-title">
+              <Store size={18} />
+              Store Details
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Store Type</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm"
+                  value={storeDetails.store_type}
+                  onChange={(e) => setStoreDetails({...storeDetails, store_type: e.target.value})}
+                  data-testid="store-type-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Phone</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm"
+                  value={storeDetails.phone}
+                  onChange={(e) => setStoreDetails({...storeDetails, phone: e.target.value})}
+                  data-testid="store-phone-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Manager Name</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm"
+                  value={storeDetails.manager_name}
+                  onChange={(e) => setStoreDetails({...storeDetails, manager_name: e.target.value})}
+                  data-testid="store-manager-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Address</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm"
+                  value={storeDetails.address_line1}
+                  onChange={(e) => setStoreDetails({...storeDetails, address_line1: e.target.value})}
+                  data-testid="store-address-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">City</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm"
+                  value={storeDetails.city}
+                  onChange={(e) => setStoreDetails({...storeDetails, city: e.target.value})}
+                  data-testid="store-city-input"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="form-label">State</label>
+                  <input
+                    type="text"
+                    className="form-input form-input-sm"
+                    value={storeDetails.state}
+                    onChange={(e) => setStoreDetails({...storeDetails, state: e.target.value})}
+                    data-testid="store-state-input"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">ZIP</label>
+                  <input
+                    type="text"
+                    className="form-input form-input-sm"
+                    value={storeDetails.zip_code}
+                    onChange={(e) => setStoreDetails({...storeDetails, zip_code: e.target.value})}
+                    data-testid="store-zip-input"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Items Section */}
+          <div className="form-section">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="form-section-title mb-0">
+                <Package size={18} />
+                Items
+              </h3>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={addItem}
+                data-testid="add-item-btn"
+              >
+                <Plus size={14} />
+                Add Item
+              </button>
+            </div>
+
+            {items.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Package size={32} className="mx-auto mb-2 opacity-50" />
+                <p>No items added yet</p>
+                <p className="text-sm">Click "Add Item" to start</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`item-row ${item.is_voided ? 'voided' : ''}`}
+                    data-testid={`item-row-${index}`}
+                  >
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-4">
+                        <label className="form-label">Item Name</label>
+                        <input
+                          type="text"
+                          className="form-input form-input-sm"
+                          placeholder="CHERRY COKE"
+                          value={item.name}
+                          onChange={(e) => updateItem(item.id, 'name', e.target.value.toUpperCase())}
+                          maxLength={14}
+                          data-testid={`item-name-input-${index}`}
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <label className="form-label flex items-center gap-1">
+                          UPC
+                          {upcLookupStatus[item.id] === 'loading' && (
+                            <Loader2 size={12} className="animate-spin text-yellow-600" />
+                          )}
+                          {upcLookupStatus[item.id] === 'success' && (
+                            <Check size={12} className="text-green-600" />
+                          )}
+                          {upcLookupStatus[item.id] === 'error' && (
+                            <X size={12} className="text-red-600" />
+                          )}
+                        </label>
+                        <div className="flex gap-1">
+                          <input
+                            type="text"
+                            className="form-input form-input-sm mono-font flex-1"
+                            placeholder="004900054961"
+                            value={item.upc}
+                            onChange={(e) => updateItem(item.id, 'upc', e.target.value)}
+                            data-testid={`item-upc-input-${index}`}
+                          />
+                          <button
+                            className="btn btn-secondary btn-icon btn-sm"
+                            onClick={() => lookupUpc(item.id, item.upc)}
+                            title="Lookup UPC"
+                            data-testid={`item-lookup-btn-${index}`}
+                          >
+                            <Search size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="form-label">Price</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-input form-input-sm"
+                          placeholder="1.62"
+                          value={item.price || ''}
+                          onChange={(e) => updateItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                          data-testid={`item-price-input-${index}`}
+                        />
+                      </div>
+                      <div className="col-span-2 flex gap-1">
+                        <select
+                          className="form-input form-input-sm"
+                          value={item.tax_flag}
+                          onChange={(e) => {
+                            updateItem(item.id, 'tax_flag', e.target.value);
+                            updateItem(item.id, 'is_taxable', ['T', 'X'].includes(e.target.value));
+                          }}
+                          data-testid={`item-tax-flag-${index}`}
+                        >
+                          <option value="X">X</option>
+                          <option value="T">T</option>
+                          <option value="F">F</option>
+                          <option value="O">O</option>
+                          <option value="N">N</option>
+                        </select>
+                        <button
+                          className="btn btn-icon btn-sm"
+                          style={{ background: item.is_voided ? '#059669' : '#FEE2E2', color: item.is_voided ? 'white' : '#DC2626' }}
+                          onClick={() => toggleVoid(item.id)}
+                          title={item.is_voided ? 'Unvoid' : 'Void'}
+                          data-testid={`item-void-btn-${index}`}
+                        >
+                          {item.is_voided ? <Check size={14} /> : <X size={14} />}
+                        </button>
+                        <button
+                          className="btn btn-danger btn-icon btn-sm"
+                          onClick={() => removeItem(item.id)}
+                          title="Remove"
+                          data-testid={`item-remove-btn-${index}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {item.quantity > 1 && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Qty: {item.quantity} @ ${item.price.toFixed(2)} each
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Tax Section */}
+          <div className="form-section">
+            <h3 className="form-section-title">
+              <Calculator size={18} />
+              Tax Rate
+            </h3>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                step="0.001"
+                className="form-input w-32"
+                value={taxRate}
+                onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                data-testid="tax-rate-input"
+              />
+              <span className="text-gray-500">%</span>
+            </div>
+          </div>
+
+          {/* Payment Details Section */}
+          <div className="form-section">
+            <h3 className="form-section-title">
+              <CreditCard size={18} />
+              Payment Details
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Payment Method</label>
+                <select
+                  className="form-input form-input-sm"
+                  value={paymentDetails.payment_method}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, payment_method: e.target.value})}
+                  data-testid="payment-method-select"
+                >
+                  <option value="DEBIT">DEBIT</option>
+                  <option value="CREDIT">CREDIT</option>
+                  <option value="CASH">CASH</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Card Last 4</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font"
+                  maxLength={4}
+                  value={paymentDetails.card_last_four}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, card_last_four: e.target.value})}
+                  data-testid="card-last-four-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Cash Back</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input form-input-sm"
+                  value={paymentDetails.cash_back}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, cash_back: parseFloat(e.target.value) || 0})}
+                  data-testid="cash-back-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">REF #</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font"
+                  value={paymentDetails.ref_number}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, ref_number: e.target.value})}
+                  data-testid="ref-number-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Network ID</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font"
+                  value={paymentDetails.network_id}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, network_id: e.target.value})}
+                  data-testid="network-id-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Approval Code</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font"
+                  value={paymentDetails.approval_code}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, approval_code: e.target.value})}
+                  data-testid="approval-code-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Terminal #</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font"
+                  value={paymentDetails.terminal_number}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, terminal_number: e.target.value})}
+                  data-testid="terminal-number-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">AID</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font text-xs"
+                  value={paymentDetails.aid}
+                  onChange={(e) => setPaymentDetails({...paymentDetails, aid: e.target.value})}
+                  data-testid="aid-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Date/Time Section */}
+          <div className="form-section">
+            <h3 className="form-section-title">
+              <FileText size={18} />
+              Transaction Details
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Date (MM/DD/YY)</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font"
+                  value={dateTime.date}
+                  onChange={(e) => setDateTime({...dateTime, date: e.target.value})}
+                  placeholder="05/03/25"
+                  data-testid="transaction-date-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Time (HH:MM:SS)</label>
+                <input
+                  type="text"
+                  className="form-input form-input-sm mono-font"
+                  value={dateTime.time}
+                  onChange={(e) => setDateTime({...dateTime, time: e.target.value})}
+                  placeholder="17:34:15"
+                  data-testid="transaction-time-input"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Preview Panel */}
+        <div className="preview-panel">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Receipt Preview</h2>
+
+          {/* Receipt - Exact Walmart format */}
+          <div className="receipt-container receipt-paper" ref={receiptRef} data-testid="receipt-preview">
+            {/* Header Logo */}
+            <div className="receipt-center">
+              <img
+                src={WALMART_LOGO_BASE64}
+                alt="Walmart"
+                className="receipt-logo-img"
+              />
+            </div>
+
+            {/* Store Info - Centered */}
+            <div className="receipt-center receipt-store-tight">
+              <div>{storeDetails.store_type}</div>
+              <div>{storeDetails.phone} Mgr:{storeDetails.manager_name}</div>
+              <div>{storeDetails.address_line1}</div>
+              <div>{storeDetails.city} {storeDetails.state} {storeDetails.zip_code}</div>
+            </div>
+
+            {/* Store Numbers */}
+            <div className="receipt-center receipt-store-numbers">
+              ST# {storeDetails.store_number} OP# {storeDetails.op_number} TE# {storeDetails.te_number} TR# {storeDetails.tr_number}
+            </div>
+
+            {/* Items */}
+            <div className="receipt-items">
+              {items.map((item) => (
+                <React.Fragment key={item.id}>
+                  {item.is_voided && (
+                    <div className="receipt-center receipt-bold">** VOIDED ENTRY **</div>
+                  )}
+                  <div className="receipt-item-row">
+                    <span className="receipt-item-name">{item.name.padEnd(14, ' ').substring(0, 14)}</span>
+                    <span className="receipt-item-upc">{item.upc || generateUPC()}</span>
+                    <span className="receipt-item-price">{item.is_voided ? `${item.price.toFixed(2)}-${item.tax_flag}` : `${item.price.toFixed(2)} ${item.tax_flag}`}</span>
+                  </div>
+                  {item.quantity > 1 && !item.is_voided && (
+                    <div className="receipt-item-row receipt-indent">
+                      <span className="receipt-item-name">{item.quantity} AT    1 FOR</span>
+                      <span className="receipt-item-upc">{item.price.toFixed(2)}</span>
+                      <span className="receipt-item-price">{(item.price * item.quantity).toFixed(2)} O</span>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Totals Section */}
+            <div className="receipt-totals-section">
+              <div className="receipt-total-line">
+                <span>SUBTOTAL</span>
+                <span className="receipt-value">{totals.subtotal}</span>
+              </div>
+              <div className="receipt-total-line">
+                <span>TAX 1    {taxRate.toFixed(3)} %</span>
+                <span className="receipt-value">{totals.taxAmount}</span>
+              </div>
+              <div className="receipt-total-line">
+                <span>TOTAL</span>
+                <span className="receipt-value">{totals.total}</span>
+              </div>
+            </div>
+
+            {/* Payment Section */}
+            <div className="receipt-payment-section">
+              <div className="receipt-total-line">
+                <span>{paymentDetails.payment_method}    TEND</span>
+                <span className="receipt-value">{totals.debitTend}</span>
+              </div>
+              {paymentDetails.cash_back > 0 && (
+                <>
+                  <div className="receipt-total-line">
+                    <span>DEBIT CASH BACK</span>
+                    <span className="receipt-value">{paymentDetails.cash_back.toFixed(2)}</span>
+                  </div>
+                  <div className="receipt-total-line">
+                    <span>TOTAL DEBIT PURCHASE</span>
+                    <span className="receipt-value">{totals.totalDebitPurchase}</span>
+                  </div>
+                  <div className="receipt-total-line">
+                    <span>CHANGE DUE</span>
+                    <span className="receipt-value">{totals.changeDue}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* EFT Details */}
+            <div className="receipt-eft-section">
+              <div className="receipt-item-line">
+                <span>EFT {paymentDetails.payment_method}</span>
+                <span>PAY FROM PRIMARY</span>
+              </div>
+              <div className="receipt-eft-amounts">
+                <div>{totals.debitTend} PURCHASE</div>
+                {paymentDetails.cash_back > 0 && (
+                  <>
+                    <div>{paymentDetails.cash_back.toFixed(2)} CASH BACK</div>
+                    <div>{totals.totalDebitPurchase} TOTAL PURCHASE</div>
+                  </>
+                )}
+              </div>
+              {paymentDetails.payment_method !== 'CASH' && (
+                <div>Debit              **** **** **** {paymentDetails.card_last_four} I O</div>
+              )}
+              <div>REF # {paymentDetails.ref_number}</div>
+              <div>NETWORK ID. {paymentDetails.network_id} APPR CODE {paymentDetails.approval_code}</div>
+              {paymentDetails.payment_method !== 'CASH' && (
+                <>
+                  <div>Debit</div>
+                  <div>AID {paymentDetails.aid}</div>
+                  <div>AAC {paymentDetails.aac}</div>
+                  <div>*Pin Verified</div>
+                </>
+              )}
+              <div>TERMINAL # {paymentDetails.terminal_number}</div>
+            </div>
+
+            {/* Date/Time and Items Sold */}
+            <div className="receipt-center receipt-datetime">
+              <div>{dateTime.date}          {dateTime.time}</div>
+              <div># ITEMS SOLD {totals.itemCount}</div>
+            </div>
+
+            {/* TC Number */}
+            <div className="receipt-center">
+              TC# {tcNumber}
+            </div>
+
+            {/* Barcode */}
+            <div className="receipt-barcode">
+              <Barcode
+                value={`TC${tcNumber.replace(/ /g, '')}${Date.now().toString()}WM`}
+                width={0.85}
+                height={28}
+                fontSize={0}
+                margin={0}
+                displayValue={false}
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="receipt-center receipt-footer">
+              <div>Low Prices You Can Trust. Every Day.</div>
+              <div>{dateTime.date}          {dateTime.time}</div>
+            </div>
+          </div>
+
+          {/* Download Buttons */}
+          <div className="download-area">
+            <button
+              className="btn btn-primary"
+              onClick={generatePdfClient}
+              disabled={isGeneratingPdf}
+              data-testid="download-pdf-btn"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Download size={16} />
+              )}
+              Download PDF
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={generatePdfBackend}
+              disabled={isGeneratingPdf}
+              data-testid="download-pdf-backend-btn"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <FileText size={16} />
+              )}
+              Generate via Server
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
