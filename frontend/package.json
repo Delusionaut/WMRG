@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
     "@fontsource/courier-prime": "^5.2.8",
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@hookform/resolvers": "^5.0.1",
